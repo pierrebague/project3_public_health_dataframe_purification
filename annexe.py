@@ -25,7 +25,7 @@ def open_csv_usefull_column():
 # remove aberant values
 def remove_little_quintille(dataframe,column_list):
     for column in column_list:
-        print(column)
+#         print(column)
         if len(dataframe[column].value_counts()) > 0:
 #         display(dataframe.head(5))
 #         dataframe.drop(dataframe[dataframe[column].apply(lambda x: not x.isnumeric())].index,inplace=True)
@@ -38,8 +38,23 @@ def remove_little_quintille(dataframe,column_list):
             dataframe.drop(column,axis = 'columns',inplace=True)
     dataframe = dataframe.dropna(axis = 'columns', how = 'all')
 
+# replace in the dataframe hyphen by space and lowercase all the text in the column_list given 
+def text_regularisation(dataframe,column_list):
+    for column in column_list:
+        dataframe[column] = dataframe[column].str.lower()
+        dataframe[column] = dataframe[column].str.replace('-',' ')
+        
+# return couples of variables where correlation score is superior to wanted_correlation from a correlation tab
+def variables_correlation_over_parameter(correlation_dataframe,wanted_correlation):
+    columns = correlation_dataframe.columns.tolist()
+    for column1 in columns:
+        for column2 in columns[columns.index(column1) + 1:]:
+            if correlation_dataframe[column1][column2] >= wanted_correlation:
+                print(column1,column2)
+
+                
 # FICHIERS = ["EdStatsCountry.csv","EdStatsCountry-Series.csv","EdStatsData.csv","EdStatsFootNote.csv"
-            # ,"EdStatsSeries.csv"]
+# ,"EdStatsSeries.csv"]
 # LOCALISATION ='F:/cour/OC/projet2/'
 # INDEX = ["secondary","tertiary","school|educationnal","student","inhabitant|household","population","technology|computer|internet"]
 # VALUES_NOT_WANTED = ["WLD","ARE","LMC","LIC","LMY","UMC","MIC","HIC","NOC","OEC","EUU","EAS","EAP","SAS","OED","ECS","LCN","LAC","LDC","SSF","SSA","ECA","MEA","NAC","HPC","MNA","EMU","ARB","IDN","ZAF"]
