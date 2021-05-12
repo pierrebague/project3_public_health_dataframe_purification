@@ -23,20 +23,42 @@ def open_csv_usefull_column():
 
 # remove row with values under the 1% quintile and over the 99% quintile of a dataframe list of column
 # remove aberant values
-def remove_little_quintille(dataframe,column_list):
+# nanquantile
+def remove_little_quantile(dataframe,column_list):
     for column in column_list:
 #         print(column)
         if len(dataframe[column].value_counts()) > 0:
 #         display(dataframe.head(5))
 #         dataframe.drop(dataframe[dataframe[column].apply(lambda x: not x.isnumeric())].index,inplace=True)
 #         dataframe[column] = pd.to_numeric(dataframe[column])
-            quantile_min = np.quantile(dataframe[column].dropna().to_numpy(),0.01)
-            quantile_max = np.quantile(dataframe[column].dropna().to_numpy(),0.99)
+            quantile_min = np.nanquantile(dataframe[column].to_numpy(),0.01)
+            quantile_max = np.nanquantile(dataframe[column].to_numpy(),0.99)
             dataframe.drop(dataframe[dataframe[column] < quantile_min].index,inplace=True)
             dataframe.drop(dataframe[dataframe[column] > quantile_max].index,inplace=True)
         else:
             dataframe.drop(column,axis = 'columns',inplace=True)
     dataframe = dataframe.dropna(axis = 'columns', how = 'all')
+    
+def remove_little_quantile2(entry_dataframe,column_list):
+    mult_param = 3
+    dataframe = entry_dataframe.copy()
+    for column in column_list:
+#         print(column)
+        if len(dataframe[column].value_counts()) > 0:
+#         display(dataframe.head(5))
+#         dataframe.drop(dataframe[dataframe[column].apply(lambda x: not x.isnumeric())].index,inplace=True)
+#         dataframe[column] = pd.to_numeric(dataframe[column])
+            quantile_min = np.nanquantile(dataframe[column].to_numpy(),0.01)
+            quantile_max = np.nanquantile(dataframe[column].to_numpy(),0.99)
+            mean = dataframe[column].mean()
+            dataframe.drop(dataframe[(((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param * mean)) | (dataframe[column] < 0))].index,inplace=True)
+            dataframe.drop(dataframe[(((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param * mean)) | (dataframe[column] > 100))].index,inplace=True)
+        else:
+            dataframe.drop(column,axis = 'columns',inplace=True)
+    dataframe = dataframe.dropna(axis = 'columns', how = 'all')
+    differences_column = entry_dataframe.columns.difference(dataframe.columns)
+    print("colonnes enlevé :",differences_column)
+    return dataframe
 
 # replace in the dataframe hyphen by space and lowercase all the text in the column_list given 
 def text_regularisation(dataframe,column_list):
