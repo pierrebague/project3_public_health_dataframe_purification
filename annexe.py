@@ -7,8 +7,118 @@ import re
 FICHIER ='F:/cour/OC/projet3/en.openfoodfacts.org.products.csv'
 
 USEFULL_COLUMNS_PATTERN = ['code','url','product_name','quantity','packaging','packaging_tags','packaging_text','brands','brands_tags','categories','categories_tags','categories_en','purchase_places','stores','countries','countries_tags','countries_en','ingredients_text','allergens','allergens_en','traces','traces_tags','traces_en','no_nutriments','nutriscore_score','nutriscore_grade','pnns_groups_1','pnns_groups_2','ecoscore_score_fr','ecoscore_grade_fr','main_category','main_category_en','image_url','_100g']
+more_hundred_columns = ["energy-kj_100g","energy-kcal_100g","energy_100g","energy-from-fat_100g","carbon-footprint_100g","carbon-footprint-from-meat-or-fish_100g"]
+can_be_hundred_columns =["fat_100g","saturated-fat_100g","monounsaturated-fat_100g","polyunsaturated-fat_100g"]
+can_be_negatif_columns = ["nutrition-score-fr_100g","nutrition-score-uk_100g"]
 
+# return the good value quantile depending of the number of value in the column
+def find_good_pourcent_quantile(dataframe,column):
+    count = dataframe[column].count()
+    if count > 1000000:
+        return 0.0001
+    elif count > 100000:
+        return 0.001
+    else:
+        return 0.01 
 
+# remove a sublist of a list
+def remove_list_elements(big_list,elements_list):
+    big_list = [elem for elem in big_list if elem not in elements_list]
+    return big_list
+
+# drop quantile part in the dataframe for each numerical column depends on their type of values   
+def remove_little_quantile3(entry_dataframe):
+    general_regex = re.compile(".*_100g.*")
+    general_column_list = list(filter(general_regex.match, entry_dataframe.columns))
+    general_column_list = remove_list_elements(general_column_list,more_hundred_columns)
+    general_column_list = remove_list_elements(general_column_list,can_be_hundred_columns)
+    general_column_list = remove_list_elements(general_column_list,can_be_negatif_columns)
+    mult_param = 3
+    mult_param_energy = 5
+    dataframe = entry_dataframe.copy()
+    print("forme du dataframe d'entré :",dataframe.shape[0]," lignes et ",dataframe.shape[1]," colonnes.")
+    
+    for column in can_be_negatif_columns:        
+        value_count_entrance = dataframe[column].shape[0]
+        if len(dataframe[column].value_counts()) > 0:
+            pourcent_quantile = find_good_pourcent_quantile(dataframe,column)
+            try:
+                quantile_min = np.nanquantile(dataframe[column].to_numpy(),pourcent_quantile)
+                quantile_max = np.nanquantile(dataframe[column].to_numpy(),1-pourcent_quantile)
+                mean = dataframe[column].mean()
+                dataframe.drop(dataframe[((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param_energy * mean ))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile inferieur")
+            try:
+                dataframe.drop(dataframe[((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param_energy * mean))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile superieur")
+            print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
+        else:
+            print("Colonne vide : ",column)
+            dataframe.drop(column,axis = 'columns',inplace=True)
+    
+    for column in more_hundred_columns:        
+        value_count_entrance = dataframe[column].shape[0]
+        if len(dataframe[column].value_counts()) > 0:
+            pourcent_quantile = find_good_pourcent_quantile(dataframe,column)
+            try:
+                quantile_min = np.nanquantile(dataframe[column].to_numpy(),pourcent_quantile)
+                quantile_max = np.nanquantile(dataframe[column].to_numpy(),1-pourcent_quantile)
+                mean = dataframe[column].mean()
+                dataframe.drop(dataframe[(((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param_energy * mean )) | (dataframe[column] < 0))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile inferieur")
+            try:
+                dataframe.drop(dataframe[((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param_energy * mean))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile superieur")
+            print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
+        else:
+            print("Colonne vide : ",column)
+            dataframe.drop(column,axis = 'columns',inplace=True)
+    
+    
+    for column in general_column_list:
+        value_count_entrance = dataframe[column].shape[0]
+        if len(dataframe[column].value_counts()) > 0:
+            pourcent_quantile = find_good_pourcent_quantile(dataframe,column)
+            try:
+                quantile_min = np.nanquantile(dataframe[column].to_numpy(),pourcent_quantile)
+                quantile_max = np.nanquantile(dataframe[column].to_numpy(),1-pourcent_quantile)
+                mean = dataframe[column].mean()
+                dataframe.drop(dataframe[(((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param * mean)) | (dataframe[column] < 0))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile inferieur")
+            try:
+                dataframe.drop(dataframe[(((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param * mean)) | (dataframe[column] > 100))].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile superieur ")
+            print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
+        else:
+            print("Colonne vide : ",column)
+            dataframe.drop(column,axis = 'columns',inplace=True)
+    
+    for column in can_be_hundred_columns:
+        value_count_entrance = dataframe[column].shape[0]
+        if len(dataframe[column].value_counts()) > 0:
+            try:
+                dataframe.drop(dataframe[dataframe[column] < 0].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile inferieur")
+            try:
+                dataframe.drop(dataframe[dataframe[column] > 100].index,inplace=True)
+            except ValueError:
+                print(column,": Pas de valeurs à enlever pour le quantile superieur")
+            print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
+        else:
+            print("Colonne vide : ",column)
+            dataframe.drop(column,axis = 'columns',inplace=True)
+    dataframe = dataframe.dropna(axis = 'columns', how = 'all')
+    differences_column = entry_dataframe.columns.difference(dataframe.columns)
+    print("forme du dataframe de sortie :",dataframe.shape[0]," lignes et ",dataframe.shape[1]," colonnes.")
+    print("colonnes enlevé :",differences_column)
+    return dataframe
 
 #open the csv file, take the columns corresponding to the pattern in USEFULL_COLUMNS_PATTERN variable and return it
 def open_csv_usefull_column():
