@@ -1,15 +1,22 @@
 import numpy as np
 import pandas as pd
 import re
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import plotly.express as px
 # import plotly.graph_objs as go
-# import seaborn as sns
-FICHIER ='F:/cour/OC/projet3/en.openfoodfacts.org.products.csv'
+import seaborn as sns
+FICHIER ='C:/Users/pierr/Documents/OC/projet3/en.openfoodfacts.org.products.csv'
 
-USEFULL_COLUMNS_PATTERN = ['code','url','product_name','quantity','packaging','packaging_tags','packaging_text','brands','brands_tags','categories','categories_tags','categories_en','purchase_places','stores','countries','countries_tags','countries_en','ingredients_text','allergens','allergens_en','traces','traces_tags','traces_en','no_nutriments','nutriscore_score','nutriscore_grade','pnns_groups_1','pnns_groups_2','ecoscore_score_fr','ecoscore_grade_fr','main_category','main_category_en','image_url','_100g']
-more_hundred_columns = ["energy-kj_100g","energy-kcal_100g","energy_100g","energy-from-fat_100g","carbon-footprint_100g","carbon-footprint-from-meat-or-fish_100g"]
-can_be_hundred_columns =["fat_100g","saturated-fat_100g","monounsaturated-fat_100g","polyunsaturated-fat_100g"]
-can_be_negatif_columns = ["nutrition-score-fr_100g","nutrition-score-uk_100g"]
+USEFULL_COLUMNS = ['code','url','product','quantity','packaging','brands','categories','purchase_places','countries','ingredients_text','allergens','traces','pnns','score','main_category',"_100g"] 
+MORE_HUNDRED_COLUMNS = ["energy_100g","energy-kj_100g","energy-kcal_100g","energy-from-fat_100g","carbon-footprint_100g","carbon-footprint-from-meat-or-fish_100g"]
+CAN_BE_HUNDRED_COLUMNS =["fat_100g","saturated-fat_100g","monounsaturated-fat_100g","polyunsaturated-fat_100g","salt_100g","sodium_100g","sugars_100g","-sucrose_100g","-glucose_100g","-fructose_100g","-lactose_100g","-maltose_100g","polyols_100g","starch_100g","carbohydrates_100g","alcohol_100g","fruits-vegetables-nuts_100g","fruits-vegetables-nuts-dried_100g","fruits-vegetables-nuts-estimate_100g","collagen-meat-protein-ratio_100g","cocoa_100g"]
+CAN_BE_NEGATIF_COLUMNS = ["nutrition-score-fr_100g","nutrition-score-uk_100g","ecoscore_score_fr"]
+
+# barplot the logarithm of the number of values for each variable in the dataframe
+def barplot_logarithm(dataframe):
+    fig = sns.barplot(x=dataframe.count().sort_values(ascending=False).index, y= np.log(dataframe.count().sort_values(ascending=False)))
+    fig.set_title("Logarithmic visualization of the number of values\nfor each variable in the dataframe")
+    fig.axes.xaxis.set_visible(False)
 
 # return the good value quantile depending of the number of value in the column
 def find_good_pourcent_quantile(dataframe,column):
@@ -30,47 +37,68 @@ def remove_list_elements(big_list,elements_list):
 def remove_little_quantile3(entry_dataframe):
     general_regex = re.compile(".*_100g.*")
     general_column_list = list(filter(general_regex.match, entry_dataframe.columns))
-    general_column_list = remove_list_elements(general_column_list,more_hundred_columns)
-    general_column_list = remove_list_elements(general_column_list,can_be_hundred_columns)
-    general_column_list = remove_list_elements(general_column_list,can_be_negatif_columns)
+    general_column_list = remove_list_elements(general_column_list,MORE_HUNDRED_COLUMNS)
+    general_column_list = remove_list_elements(general_column_list,CAN_BE_HUNDRED_COLUMNS)
+    general_column_list = remove_list_elements(general_column_list,CAN_BE_NEGATIF_COLUMNS)
     mult_param = 3
-    mult_param_energy = 5
+    mult_param_energy = 3
     dataframe = entry_dataframe.copy()
     print("forme du dataframe d'entré :",dataframe.shape[0]," lignes et ",dataframe.shape[1]," colonnes.")
     
-    for column in can_be_negatif_columns:        
+    for column in CAN_BE_NEGATIF_COLUMNS:        
+        if column not in dataframe.columns:
+            break
         value_count_entrance = dataframe[column].shape[0]
+        
+        
         if len(dataframe[column].value_counts()) > 0:
             pourcent_quantile = find_good_pourcent_quantile(dataframe,column)
+            
             try:
                 quantile_min = np.nanquantile(dataframe[column].to_numpy(),pourcent_quantile)
+            except ValueError:
+                break
+            
+            try:    
                 quantile_max = np.nanquantile(dataframe[column].to_numpy(),1-pourcent_quantile)
-                mean = dataframe[column].mean()
+            except ValueError:
+                break    
+            mean = dataframe[column].mean()
+                
+            try:
                 dataframe.drop(dataframe[((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param_energy * mean ))].index,inplace=True)
             except ValueError:
                 print(column,": Pas de valeurs à enlever pour le quantile inferieur")
+            
             try:
                 dataframe.drop(dataframe[((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param_energy * mean))].index,inplace=True)
             except ValueError:
                 print(column,": Pas de valeurs à enlever pour le quantile superieur")
+            
             print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
         else:
             print("Colonne vide : ",column)
             dataframe.drop(column,axis = 'columns',inplace=True)
     
-    for column in more_hundred_columns:        
+    for column in MORE_HUNDRED_COLUMNS:        
         value_count_entrance = dataframe[column].shape[0]
         if len(dataframe[column].value_counts()) > 0:
             pourcent_quantile = find_good_pourcent_quantile(dataframe,column)
+#             try:
+#                 dataframe.drop(dataframe[dataframe[column] > 4000].index,inplace=True)
+#             except ValueError:
+#                 print(column,": Pas de valeurs à enlever pour energie au dessus de 4000 ")
+            
             try:
-                quantile_min = np.nanquantile(dataframe[column].to_numpy(),pourcent_quantile)
-                quantile_max = np.nanquantile(dataframe[column].to_numpy(),1-pourcent_quantile)
-                mean = dataframe[column].mean()
-                dataframe.drop(dataframe[(((dataframe[column] < quantile_min) & (abs(dataframe[column] - mean) > mult_param_energy * mean )) | (dataframe[column] < 0))].index,inplace=True)
+                quantile_min = np.nanquantile(dataframe[column].to_numpy(),0.01)
+                quantile_max = np.nanquantile(dataframe[column].to_numpy(),0.99)
+                median = dataframe[column].median()
+#                 print("quantile quantile_min quantile_max median max: ",quantile_min,quantile_max,median,dataframe[column].max())
+                dataframe.drop(dataframe[(((dataframe[column] < quantile_min) & (abs(dataframe[column] - median) > mult_param_energy * median )) | (dataframe[column] < 0))].index,inplace=True)
             except ValueError:
                 print(column,": Pas de valeurs à enlever pour le quantile inferieur")
             try:
-                dataframe.drop(dataframe[((dataframe[column] > quantile_max) & (abs(dataframe[column] - mean) > mult_param_energy * mean))].index,inplace=True)
+                dataframe.drop(dataframe[(((dataframe[column] > quantile_max) & (abs(dataframe[column] - median) > mult_param_energy * median)))].index,inplace=True)
             except ValueError:
                 print(column,": Pas de valeurs à enlever pour le quantile superieur")
             print("column :",column,", ",value_count_entrance - dataframe[column].shape[0]," values erased")
@@ -99,7 +127,7 @@ def remove_little_quantile3(entry_dataframe):
             print("Colonne vide : ",column)
             dataframe.drop(column,axis = 'columns',inplace=True)
     
-    for column in can_be_hundred_columns:
+    for column in CAN_BE_HUNDRED_COLUMNS:
         value_count_entrance = dataframe[column].shape[0]
         if len(dataframe[column].value_counts()) > 0:
             try:
@@ -124,9 +152,11 @@ def remove_little_quantile3(entry_dataframe):
 def open_csv_usefull_column():
     dataframe = pd.read_csv(FICHIER,sep='\t',low_memory=False)
     column_list = []
-    for pattern in USEFULL_COLUMNS_PATTERN:
-        regex = re.compile(".*" + pattern + ".*")
+    for reg in USEFULL_COLUMNS:
+#     column_list = USEFULL_COLUMNS
+        regex = re.compile(".*" + reg + ".*")
         column_list = column_list + list(filter(regex.match, dataframe.columns))
+    
     dataframe.drop(dataframe.columns.difference(column_list),1,inplace=True)
     dataframe = dataframe.dropna(axis = 'columns', how = 'all')
     return dataframe
@@ -175,16 +205,38 @@ def text_regularisation(dataframe,column_list):
     for column in column_list:
         dataframe[column] = dataframe[column].str.lower()
         dataframe[column] = dataframe[column].str.replace('-',' ')
-        
+        if column == "pnns_groups_2":
+            dataframe[column].replace("pizza pies and quiches","pizza pies and quiche",inplace = True)
+            
 # return couples of variables where correlation score is superior to wanted_correlation from a correlation tab
 def variables_correlation_over_parameter(correlation_dataframe,wanted_correlation):
     columns = correlation_dataframe.columns.tolist()
+    print("Correlation de",wanted_correlation)
     for column1 in columns:
         for column2 in columns[columns.index(column1) + 1:]:
             if correlation_dataframe[column1][column2] >= wanted_correlation:
-                print(column1,column2)
+                print(column1,"et",column2)
 
-                
+def plot_correlation_matrix(correlation_dataframe):
+    f = plt.figure(figsize=(40, 40))
+    plt.matshow(correlation_dataframe, fignum=f.number)
+    plt.xticks(range(correlation_dataframe.select_dtypes(['number']).shape[1]), correlation_dataframe.select_dtypes(['number']).columns, fontsize=14, rotation=45)
+    plt.yticks(range(correlation_dataframe.select_dtypes(['number']).shape[1]), correlation_dataframe.select_dtypes(['number']).columns, fontsize=14)
+    cb = plt.colorbar()
+    cb.ax.tick_params(labelsize=15)
+    plt.title('Correlation Matrix', fontsize=16)
+
+def plot_heat_map(correlation_dataframe):
+    datalist = correlation_dataframe.values.tolist()
+    fig = px.imshow(np.array(datalist),
+                    #labels=dict(x="variable 1",y="varible 2"),
+                   x=correlation_dataframe.columns,
+                   y=correlation_dataframe.columns,
+                   width=700,
+                   height=700)
+    fig.update_layout(title_text="Correlation matrix",title_x = 0.6,title_y=0.95,title_font_size=25)
+    fig.show()    
+    
 # FICHIERS = ["EdStatsCountry.csv","EdStatsCountry-Series.csv","EdStatsData.csv","EdStatsFootNote.csv"
 # ,"EdStatsSeries.csv"]
 # LOCALISATION ='F:/cour/OC/projet2/'
