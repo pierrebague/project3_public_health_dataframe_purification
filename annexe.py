@@ -8,16 +8,82 @@ import seaborn as sns
 FICHIER ='C:/Users/pierr/Documents/OC/projet3/en.openfoodfacts.org.products.csv'
 
 USEFULL_COLUMNS = ['code','url','product','quantity','packaging','brands','categories','purchase_places','countries','ingredients_text','allergens','traces','pnns','score','main_category',"_100g"] 
+PARASITE_COLUMNS = ['serving_quantity']
 MORE_HUNDRED_COLUMNS = ["energy_100g","energy-kj_100g","energy-kcal_100g","energy-from-fat_100g","carbon-footprint_100g","carbon-footprint-from-meat-or-fish_100g"]
 CAN_BE_HUNDRED_COLUMNS =["fat_100g","saturated-fat_100g","monounsaturated-fat_100g","polyunsaturated-fat_100g","salt_100g","sodium_100g","sugars_100g","-sucrose_100g","-glucose_100g","-fructose_100g","-lactose_100g","-maltose_100g","polyols_100g","starch_100g","carbohydrates_100g","alcohol_100g","fruits-vegetables-nuts_100g","fruits-vegetables-nuts-dried_100g","fruits-vegetables-nuts-estimate_100g","collagen-meat-protein-ratio_100g","cocoa_100g"]
 CAN_BE_NEGATIF_COLUMNS = ["nutrition-score-fr_100g","nutrition-score-uk_100g","ecoscore_score_fr"]
 
+def find_pnns1_part(dataframe,column):
+    all_needed = dataframe.loc[dataframe[column].dropna().index]
+    print(all_needed.shape[0],"produits trouvés")
+    plt.pie(all_needed['pnns_groups_1'].value_counts(),labels = all_needed['pnns_groups_1'].value_counts().index)
+    all_the_title = "pnns group for food containing "+column[:-5]
+    text = plt.title(all_the_title, fontsize=15)
+    
+def find_pnns2_part(dataframe,column):
+    all_needed = dataframe.loc[dataframe[column].dropna().index]
+    print(all_needed.shape[0],"produits trouvés")
+    plt.pie(all_needed['pnns_groups_2'].value_counts(),labels = all_needed['pnns_groups_2'].value_counts().index)
+    all_the_title = "pnns group for food containing "+column[:-5]
+    text = plt.title(all_the_title, fontsize=15)
+
+def smooth_density_marginal_histograms(dataframe,x_values,y_values,xmax,ymax,title):
+    sns.set_theme(style="white")
+    g = sns.JointGrid(data=dataframe, x=x_values, y=y_values, space=0)
+    g.plot_joint(sns.kdeplot,
+                 fill=True, clip=((0, xmax), (0, ymax)),
+                 thresh=0, levels=100, cmap="mako")
+    s = g.plot_marginals(sns.histplot, color="#03051A", alpha=1, bins=25)
+    plt.title(title, fontsize=16,x=-2.5, y=-0.2)
+
+def bivariate_plot_multiple_elements(dataframe,variable1,variable2,title):
+    f, ax = plt.subplots(figsize=(6, 6))
+    sns.set_theme(style="dark")
+    sns.scatterplot(x=dataframe[variable1], y=dataframe[variable2], s=5, color=".15")
+    sns.histplot(x=dataframe[variable1], y=dataframe[variable2], bins=50, pthresh=.1, cmap="mako")
+    sns.kdeplot(x=dataframe[variable1], y=dataframe[variable2], levels=5, color="w", linewidths=1)
+    plt.title(title, fontsize=16)
+
 # barplot the logarithm of the number of values for each variable in the dataframe
-def barplot_logarithm(dataframe):
-    fig = sns.barplot(x=dataframe.count().sort_values(ascending=False).index, y= np.log(dataframe.count().sort_values(ascending=False)))
-    fig.set_title("Logarithmic visualization of the number of values\nfor each variable in the dataframe")
+def barplot_logarithm(dataframe,title):
+    fig = sns.barplot(x=dataframe.sort_values(ascending=False).index, y= np.log10(dataframe.sort_values(ascending=False)))
+    fig.set_title(title)
     fig.axes.xaxis.set_visible(False)
 
+def barplot_logarithm2(values_list):
+    positive = values_list[values_list > 0]
+    negative = values_list[values_list < 0]
+    f, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 15))
+    sns.barplot(x=positive.sort_values(ascending=False).index, y= positive.sort_values(ascending=False), ax=ax1)
+    for i,value in enumerate(positive.sort_values(ascending=False)):
+        ax1.text(i,value,str(format(value, '.0e')),fontsize=10,ha='center')
+    axe2 = sns.barplot(x=negative.sort_values().index, y= negative.sort_values() * -1, ax=ax2)
+    for i,value in enumerate(negative.sort_values()):
+        ax2.text(i,value*-1,str(format(value*-1, '.0e')),fontsize=10,ha='center')
+    ax1.set_title('positive minimum values')
+    ax2.set_title('absolute value of negative minimum values')
+    ax1.axes.xaxis.set_visible(False)
+    ax2.axes.xaxis.set_visible(False)
+
+def horizontal_bar_plot_mono(dataframe,title):#,xmin,xmax):
+    sns.set_theme(style="whitegrid")
+    f, ax = plt.subplots(figsize=(6, 15))
+#     dataframe2 = dataframe.sort_values(by=[sort_by],ascending=False)
+    sns.set_color_codes("pastel")
+    sns.barplot(x=dataframe.sort_values(ascending=False).index, y=dataframe.sort_values(ascending=False), color="b")
+#     ax.legend(ncol=1, loc="lower right", frameon=True,fontsize='large')
+#     ax.xaxis.tick_top()   
+    ax.xaxis.set_visible(False)
+    xmin = dataframe.sort_values(ascending=False)[-1]
+    xmax = dataframe.sort_values(ascending=False)[0]
+    for i,value in enumerate(dataframe.sort_values(ascending=False)):
+            ax.text(value+3/xmin, i + 0.2,str(int(value)),fontsize=15)    
+    plt.xlabel( xlabel=title,fontsize=18)
+    ax.set(xlim=(xmin, xmax), ylabel="", xlabel=title)
+    ax.xaxis.set_visible(False)
+    sns.despine(left=True, bottom=True)    
+    
+    
 # return the good value quantile depending of the number of value in the column
 def find_good_pourcent_quantile(dataframe,column):
     count = dataframe[column].count()
@@ -148,9 +214,10 @@ def remove_little_quantile3(entry_dataframe):
     print("colonnes enlevé :",differences_column)
     return dataframe
 
-#open the csv file, take the columns corresponding to the pattern in USEFULL_COLUMNS_PATTERN variable and return it
+#open the csv file, take the columns corresponding to the pattern in USEFULL_COLUMNS_PATTERN variable and return it without duplicates
 def open_csv_usefull_column():
     dataframe = pd.read_csv(FICHIER,sep='\t',low_memory=False)
+    print("Ouverture initial, fichier avec",dataframe.shape[0],"colonnes et",dataframe.shape[1],"lignes")
     column_list = []
     for reg in USEFULL_COLUMNS:
 #     column_list = USEFULL_COLUMNS
@@ -158,7 +225,12 @@ def open_csv_usefull_column():
         column_list = column_list + list(filter(regex.match, dataframe.columns))
     
     dataframe.drop(dataframe.columns.difference(column_list),1,inplace=True)
-    dataframe = dataframe.dropna(axis = 'columns', how = 'all')
+    dataframe.drop(PARASITE_COLUMNS,1,inplace=True)
+    dataframe.dropna(axis = 'columns', how = 'all',inplace=True)
+    
+    
+    dataframe.drop_duplicates(subset=column_list.remove('code'),inplace=True)
+    print("Purification initial, fichier avec",dataframe.shape[0],"colonnes et",dataframe.shape[1],"lignes")
     return dataframe
 
 # remove row with values under the 1% quintile and over the 99% quintile of a dataframe list of column
@@ -209,12 +281,12 @@ def text_regularisation(dataframe,column_list):
             dataframe[column].replace("pizza pies and quiches","pizza pies and quiche",inplace = True)
             
 # return couples of variables where correlation score is superior to wanted_correlation from a correlation tab
-def variables_correlation_over_parameter(correlation_dataframe,wanted_correlation):
+def variables_correlation_over_parameter(correlation_dataframe,wanted_correlation_min,wanted_correlation_max):
     columns = correlation_dataframe.columns.tolist()
-    print("Correlation de",wanted_correlation)
+    print("Correlation entre",wanted_correlation_min,"et",wanted_correlation_max)
     for column1 in columns:
         for column2 in columns[columns.index(column1) + 1:]:
-            if correlation_dataframe[column1][column2] >= wanted_correlation:
+            if correlation_dataframe[column1][column2] >= wanted_correlation_min and correlation_dataframe[column1][column2] <= wanted_correlation_max:
                 print(column1,"et",column2)
 
 def plot_correlation_matrix(correlation_dataframe):
@@ -236,7 +308,21 @@ def plot_heat_map(correlation_dataframe):
                    height=700)
     fig.update_layout(title_text="Correlation matrix",title_x = 0.6,title_y=0.95,title_font_size=25)
     fig.show()    
-    
+def good_or_bad_correlation(correlation_matrix,dataframe_correlate,correlation_value):
+    for num,column in enumerate(correlation_matrix.columns):
+        for row1 in correlation_matrix.columns[num+1:]:
+            comptnan = 0
+            comptvalues  = 0
+            if correlation_matrix[column][row1] >= correlation_value:
+                print("-------------------------------------------------------------------------------")
+                if ((dataframe_correlate[column].notna()) & (dataframe_correlate[row1].notna())).sum() > 25:
+                    display(dataframe_correlate[((dataframe_correlate[column].notna()) & (dataframe_correlate[row1].notna()))][[column,row1]].head(5))
+                    display(dataframe_correlate[((dataframe_correlate[column].isna()) & (dataframe_correlate[row1].notna()))][[column,row1]].head(5))
+                    display(dataframe_correlate[((dataframe_correlate[column].notna()) & (dataframe_correlate[row1].isna()))][[column,row1]].head(5))
+                    
+                else:
+                    print("Fausse correlation de ",correlation_value," pour ",column," and ",row1)    
+
 # FICHIERS = ["EdStatsCountry.csv","EdStatsCountry-Series.csv","EdStatsData.csv","EdStatsFootNote.csv"
 # ,"EdStatsSeries.csv"]
 # LOCALISATION ='F:/cour/OC/projet2/'
